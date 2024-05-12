@@ -32,7 +32,6 @@ SPISettings spiSettings(20000000, LSBFIRST, SPI_MODE0);
 // A2B Settings
 int masterNodeID = 0;
 int ampNodeID = 1;
-byte a2bAmpExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
 int FOHCMicNodeID = -1;
 // int FOHCMicNodeID = 1;
 // int ampNodeID = 2;
@@ -40,10 +39,7 @@ int FOHCMicNodeID = -1;
 int audioBitRate = 32;
 
 unsigned int masterNodeChipID[4] = {0xAD, 0x02, 0x25, 0x01};
-unsigned int slave0NodeChipID[4] = {0xAD, 0x10, 0x21, 0x01};
-
-struct {
-    byte addr
-} i2cPeriphConfig_t;
+unsigned int a2bAmpExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
+unsigned int FOHCMicExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
 
 #endif
