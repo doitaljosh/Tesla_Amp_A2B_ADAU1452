@@ -18,16 +18,18 @@
 #define PIN_FDA2100_EN 5
 #define PIN_AMPS_OVERTEMP 7
 
-#define OUTPUT = LOW = 0;
-#define INPUT = HIGH = 1;
+#define OUTPUT 0
+#define LOW 0
+#define INPUT 1
+#define HIGH 1
 
 int pcaWritePin(int gpio, bool state);
 bool pcaReadPin(int gpio);
 int pcaWriteReg(byte reg, byte mask);
-int pcaReadReg(byte reg);
+byte pcaReadReg(byte reg);
 int pcaSetPinDirection(int gpio, bool direction);
 int pcaInvertPinPolarity(int gpio, bool polarity);
-char getAmplifierId(void);
+char* getAmplifierId(void);
 int amplifierInit(void);
 
 static unsigned int amplifierLocalA2bConfig [21][2] = {
@@ -50,15 +52,15 @@ static unsigned int amplifierLocalA2bConfig [21][2] = {
   {AD242x_REG_PINTEN, 0x00},
   {AD242x_REG_PINTINV, 0x00},
   {AD242x_REG_PINCFG, 0x01}, // High drive strength for pins
-  {AD242x_REG_INTMSK0, 0x00},
-  {AD242x_REG_INTMSK1, 0x00}
+  {AD242x_REG_INTMSK, 0x00},
+  {(AD242x_REG_INTMSK + 1), 0x00}
 };
 
 unsigned int tda7802ConfigData[6] = {
     0x0f, 0x00, 0x18, 0x49, 0x00, 0x01
 };
 
-unsigned int fda2100ConfigData[15] {
+unsigned int fda2100ConfigData[15] = {
     0x5c, 0x07, 0x0f, 0x00,
     0x00, 0x11, 0x11, 0x11, 
     0x11, 0x00, 0x00, 0x00,

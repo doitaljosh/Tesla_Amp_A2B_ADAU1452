@@ -4,18 +4,61 @@
 #include "Settings.h"
 #include "Utils.h"
 
+#include <Wire.h>
+
 enum States {
   STATE_DISCOVERY_NOT_DONE = 0,
   STATE_DISCOVERY_DONE = 1,
   STATE_SLAVE_INIT_DONE = 2
 };
 
+bool isPostDiscovery = false;
 int currentState = STATE_DISCOVERY_NOT_DONE;
+
+void printLineFaultMsg(int intType) {
+  bool knownFault = false;
+  int numMsgs = sizeof(lineFaultStrings) / sizeof(mappedMsg_t);
+
+  Serial.print("E: A2B line fault detected: ");
+
+  for (int i=0; i<numMsgs; i++) {
+    if (lineFaultStrings[i].msgId == intType) {
+      Serial.println(lineFaultStrings[i].msg);
+      knownFault = true;
+      break;
+    }
+  }
+
+  if (!knownFault) {
+    Serial.println("Unknown fault");
+  }
+}
+
+void handleLineFault(int intType) {
+  if (isPostDiscovery) {
+    printLineFaultMsg(intType);
+  } else {
+    // Diagnostics during discovery
+  }
+}
 
 void handleInterrupt(a2bInt_t a2bint) {
   switch (a2bint.MstrSub) {
     case A2B_INTSRC_MASTER: {
-
+      switch (a2bint.intType) {
+        case MSTR_RUNNING: {
+          if (isPostDiscovery) {
+            handleLineFault(a2bint.intType);
+          } else {
+            beginDiscovery();
+          }
+          break;
+        }
+        case DISCOVERY_DONE: {
+          initSlaves();
+          break;
+        }
+      }
       break;
     }
     case A2B_INTSRC_SUB: {
@@ -44,18 +87,19 @@ void handleInterrupt(a2bInt_t a2bint) {
 int beginDiscovery(void) {
   int discTimeout = 0;
   int intval = 0;
+  byte DATA_INTMSK[3] = {0x10, 0x00, 0x09};
   // Initialize the registers necessary to begin discovery
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_CONTROL, 1, 0x04);
+  a2bWriteLocalReg(AD242x_REG_CONTROL, 0x04);
   delay(34);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_INTMSK, 3, {0x10, 0x00, 0x09});
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_BECCTL, 1, 0x00);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, (AD242x_REG_INTPND + 0x02), 1, 0x01);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_RESPCYCS, 1, 0x92);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_CONTROL, 1, 0x01);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_PLLCTL, 1, 0x00);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_I2SGCFG, 1, 0x02);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_SWCTL, 1, 0x01);
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_DISCVRY, 1, 0x92);
+  a2bWriteLocalRegBlock(AD242x_REG_INTMSK, 3, DATA_INTMSK);
+  a2bWriteLocalReg(AD242x_REG_BECCTL, 0x00);
+  a2bWriteLocalReg((AD242x_REG_INTPND + 0x02), 0x01);
+  a2bWriteLocalReg(AD242x_REG_RESPCYCS, 0x92);
+  a2bWriteLocalReg(AD242x_REG_CONTROL, 0x01);
+  a2bWriteLocalReg(AD242x_REG_PLLCTL, 0x00);
+  a2bWriteLocalReg(AD242x_REG_I2SGCFG, 0x02);
+  a2bWriteLocalReg(AD242x_REG_SWCTL, 0x01);
+  a2bWriteLocalReg(AD242x_REG_DISCVRY, 0x92);
   // Wait for the discovery done interrupt and timeout after 35ms
   while (true) {
     a2bInt_t receivedInterrupt = a2bReceiveInterrupt();
@@ -67,11 +111,13 @@ int beginDiscovery(void) {
         Serial.print("E: A2B discovery timed out. Returned interrupt ");
         Serial.println(receivedInterrupt.intType);
         currentState = STATE_DISCOVERY_NOT_DONE;
+        isPostDiscovery = false;
         handleInterrupt(receivedInterrupt);
       }
     } else {
       Serial.println("I: A2B discovery done.");
       currentState = STATE_DISCOVERY_DONE;
+      isPostDiscovery = true;
       return DISCOVERY_DONE;
     }
     return 0;
@@ -80,21 +126,25 @@ int beginDiscovery(void) {
 }
 
 int initFOHCMicNode(void) {
-  
+
 }
 
 int initAmplifierNode(void) {
-  byte a2bAmpChipID[4] = 0;
-  byte a2bAmpEepromData[8] = 0;
+  byte a2bAmpChipID[4];
+  char* a2bAmpReadChipID;
+  char* a2bAmpEepromData;
 
   if (a2bGetCurrentNodeAddr() == ampNodeID) {
-    a2bAmpChipID = a2bReadRemoteReg(ampNodeID, AD242x_REG_VENDOR, 4);
-
+    a2bAmpReadChipID = a2bReadRemoteRegBlock(ampNodeID, AD242x_REG_VENDOR, 4);
+    for (int i=0; i<4; i++) {
+      a2bAmpChipID[i] = a2bAmpReadChipID[i];
+    }
+    
     if (a2bAmpChipID == a2bAmpExpectedChipID) {
-      print("I: Found Tesla A2B Amplifier at node ID: ");
-      println(ampNodeID);
+      Serial.print("I: Found Tesla A2B Amplifier at node ID: ");
+      Serial.println(ampNodeID);
 
-      a2bAmpEepromData = getAmplifierID();
+      a2bAmpEepromData = getAmplifierId();
       Serial.print("I: EEPROM data: ");
       for (int i=0; i<8; i++) {
         Serial.print(a2bAmpEepromData[i], HEX);
@@ -108,7 +158,6 @@ int initAmplifierNode(void) {
         a2bWriteRemoteReg(
           ampNodeID, 
           amplifierLocalA2bConfig[regidx][0],
-          1,
           amplifierLocalA2bConfig[regidx][1]
           );
       }
@@ -124,16 +173,16 @@ int initAmplifierNode(void) {
         if (a2bReceiveInterrupt().MstrSub == A2B_INTSRC_SUB) {
           delay(23);
 
-          if (a2bReadRemoteReg(ampNodeID, AD242x_REG_GPIOIEN, 1) != 0x20) {
-            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOIEN, 1, 0x20); // Enable input for GPIO5 (GPIO expander interrupt).
+          if ((int)a2bReadRemoteReg(ampNodeID, AD242x_REG_GPIOIEN) != 0x20) {
+            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOIEN, 0x20); // Enable input for GPIO5 (GPIO expander interrupt).
           }
 
-          if (a2bReadRemoteReg(ampNodeID, AD242x_REG_GPIOOEN, 1) != 0x44) {
-            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOOEN, 1, 0x44); // Enable output for GPIO2 and GPIO6 (Va2b5v5 enable, unknown)
+          if ((int)a2bReadRemoteReg(ampNodeID, AD242x_REG_GPIOOEN) != 0x44) {
+            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOOEN, 0x44); // Enable output for GPIO2 and GPIO6 (Va2b5v5 enable, unknown)
           }
 
-          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATSET, 1, 0x04); // Set GPIO2 high (Va2b5v5 enable)
-          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATCLR, 1, 0x40); // Clear the configuration for GPIO6
+          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATSET, 0x04); // Set GPIO2 high (Va2b5v5 enable)
+          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATCLR, 0x40); // Clear the configuration for GPIO6
 
           // Configure all I2C peripherals inside the amplifier
           if (amplifierInit()) {
@@ -156,7 +205,7 @@ int initAmplifierNode(void) {
 }
 
 int initSlaves(void) {
-  a2bWriteLocalReg(I2CADDR_A2B_MASTER, AD242x_REG_SWCTL, (A2B_SWCTL_MODE_USE_VIN & A2B_SWCTL_ENSW_ENABLED));
+  a2bWriteLocalReg(AD242x_REG_SWCTL, (byte)(A2B_SWCTL_MODE_USE_VIN & A2B_SWCTL_ENSW_ENABLED));
   
   if (currentState = STATE_DISCOVERY_DONE) {
     if (FOHCMicNodeID > 0) {
@@ -187,6 +236,6 @@ void setup() {
 }
 
 void loop() {
-  handleInterrupt(a2bReadInterrupt());
+  handleInterrupt(a2bReceiveInterrupt());
   delay(500);
 }

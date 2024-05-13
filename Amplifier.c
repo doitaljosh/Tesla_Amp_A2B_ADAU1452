@@ -8,18 +8,18 @@
 /// @return 1 on successful execution
 int pcaInit(void) {
     int retval = 0;
-    retval += a2bWriteRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_OUT_PORT, 1, 0x00);
-    retval += a2bWriteRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_CFG, 1, 0x00);
+    retval += a2bWriteRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_OUT_PORT, 0x00);
+    retval += a2bWriteRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_CFG, 0x00);
 
     return retval == 2 ? 1 : 0;
 }
 
 int pcaWriteReg(byte reg, byte mask) {
-  return a2bWriteRemotePeriReg(ampNodeID, I2CADDR_PCA9538, reg, 1, mask);
+  return a2bWriteRemotePeriReg(ampNodeID, I2CADDR_PCA9538, reg, mask);
 }
 
 byte pcaReadReg(byte reg) {
-  return a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, reg, 1);
+  return a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, reg);
 }
 
 /// @brief Sets the output state of a GPIO expander pin
@@ -28,7 +28,7 @@ byte pcaReadReg(byte reg) {
 /// @return 1 on successful execution
 int pcaWritePin(int gpio, bool state) {
     if (gpio < PCA9538_MAX_GPIOS) {
-        unsigned char currentState = (unsigned char)a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_OUT_PORT, 1);
+        unsigned char currentState = (unsigned char)a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_OUT_PORT);
         
         if (state) {
             currentState |= (1 << gpio);
@@ -40,7 +40,6 @@ int pcaWritePin(int gpio, bool state) {
             ampNodeID, 
             I2CADDR_PCA9538,
             PCA9538_OUT_PORT,
-            1,
             currentState
         ); 
     }
@@ -54,7 +53,7 @@ bool pcaReadPin(int gpio) {
     if (gpio < PCA9538_MAX_GPIOS) {
         int mask = 1 << gpio;
 
-        return (a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_IN_PORT, 1) & mask) == mask;
+        return (a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_IN_PORT) & mask) == mask;
     }
 }
 
@@ -64,7 +63,7 @@ bool pcaReadPin(int gpio) {
 /// @return 1 on successful execution
 int pcaSetPinDirection(int gpio, bool direction) {
     if (gpio < PCA9538_MAX_GPIOS) {
-        unsigned char currentState = (unsigned char)a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_CFG, 1);
+        unsigned char currentState = (unsigned char)a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_CFG);
 
         if (direction) {
             currentState |= (1 << gpio);
@@ -76,7 +75,6 @@ int pcaSetPinDirection(int gpio, bool direction) {
             ampNodeID, 
             I2CADDR_PCA9538,
             PCA9538_CFG,
-            1,
             currentState
         ); 
     }
@@ -89,7 +87,7 @@ int pcaSetPinDirection(int gpio, bool direction) {
 /// @return 1 on successful execution
 int pcaInvertPinPolarity(int gpio, bool polarity) {
     if (gpio < PCA9538_MAX_GPIOS) {
-        unsigned char currentState = (unsigned char)a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_INV, 1);
+        unsigned char currentState = (unsigned char)a2bReadRemotePeriReg(ampNodeID, I2CADDR_PCA9538, PCA9538_INV);
 
         if (polarity) {
             currentState |= (1 << gpio);
@@ -101,7 +99,6 @@ int pcaInvertPinPolarity(int gpio, bool polarity) {
             ampNodeID, 
             I2CADDR_PCA9538,
             PCA9538_INV,
-            1,
             currentState
         ); 
     }
@@ -111,8 +108,8 @@ int pcaInvertPinPolarity(int gpio, bool polarity) {
 /// @brief Returns the 8-byte amplifier identification data stored in it's EEPROM
 /// @param  
 /// @return 8 byte char array
-char getAmplifierID(void) {
-    char data[8] = a2bReadRemotePeriReg(ampNodeID, I2CADDR_EEPROM_AMP, 0x00, 8);
+char* getAmplifierID(void) {
+    char* data = a2bReadRemotePeriRegBlock(ampNodeID, I2CADDR_EEPROM_AMP, 0x00, 8);
 
     return data;
 }
@@ -136,8 +133,8 @@ int amplifierInit(void) {
 
     delayMicroseconds(30000);
 
-    retval += a2bWriteRemotePeriReg(ampNodeID, I2CADDR_TDA7802, 0x00, sizeof(tda7802ConfigData), tda7802ConfigData);
-    retval += a2bWriteRemotePeriReg(ampNodeID, I2CADDR_FDA2100, 0x00, sizeof(fda2100ConfigData), fda2100ConfigData);
+    retval += a2bWriteRemotePeriRegBlock(ampNodeID, I2CADDR_TDA7802, 0x00, sizeof(tda7802ConfigData), tda7802ConfigData);
+    retval += a2bWriteRemotePeriRegBlock(ampNodeID, I2CADDR_FDA2100, 0x00, sizeof(fda2100ConfigData), fda2100ConfigData);
 
     return retval == 8 ? 1 : 0;
 }

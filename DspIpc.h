@@ -1,6 +1,8 @@
 #ifndef __DSPIPC_H__
 #define __DSPIPC_H__
 
+#include <Arduino.h>
+
 // Include the SPI library if SPI is enabled, otherwise include the I2C library.
 #include <SPI.h>
 #include <Wire.h>
@@ -19,7 +21,7 @@ typedef unsigned short dspreg_t;
 const int sampleRate = 48000;
 
 // Function prototypes
-int dspWriteReg_Block(byte dspAddr, int addr, int len, byte data[]);
+int dspWriteReg_Block(int addr, int len, byte data[]);
 int dspWriteReg_Int(int addr, int32_t data);
 int dspWriteReg_Float(int addr, double data);
 int dspDelay(byte dspAddr, int len, byte data[]);

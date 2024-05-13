@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "DspIpc.h"
 #include "Settings.h"
 
@@ -184,9 +185,9 @@ int32_t dspReadReg_Int(int addr, int len) {
 double dspReadReg_Float(int addr) {
     int32_t regVal_Int = dspReadReg_Int(addr, 4);
 #if DSP_CORE == SIGMA300
-    return double(regVal_Int) / (1 << 24);
+    return (double)(regVal_Int) / (1 << 24);
 #else
-    return double(regVal_Int) / (1 << 23);
+    return (double)(regVal_Int) / (1 << 23);
 #endif
 }
 

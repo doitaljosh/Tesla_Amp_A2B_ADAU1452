@@ -1,12 +1,7 @@
 #ifndef __SETTINGS___
 #define __SETTINGS___
 
-// Uncomment if the DSP is connected using the SPI bus.
-#define SPI_ENABLED true
-
-#if SPI_ENABLED
 #include <SPI.h>
-#endif
 
 // IO Pins
 int DSP_PIN_SS = 38;
@@ -26,20 +21,21 @@ int DSP_PIN_RST = 5;
 // I2C Settings
 const int I2C_MAX_DATA_LEN = 30;
 
+
 // SPI Settings
-SPISettings spiSettings(20000000, LSBFIRST, SPI_MODE0);
+// SPISettings spiSettings(20000000, LSBFIRST, SPI_MODE0);
 
 // A2B Settings
-int masterNodeID = 0;
-int ampNodeID = 1;
-int FOHCMicNodeID = -1;
+const int masterNodeID = 0;
+const int ampNodeID = 1;
+const int FOHCMicNodeID = -1;
 // int FOHCMicNodeID = 1;
 // int ampNodeID = 2;
 
-int audioBitRate = 32;
+const int audioBitRate = 32;
 
-unsigned int masterNodeChipID[4] = {0xAD, 0x02, 0x25, 0x01};
-unsigned int a2bAmpExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
-unsigned int FOHCMicExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
+unsigned char masterNodeChipID[4] = {0xAD, 0x02, 0x25, 0x01};
+unsigned char a2bAmpExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
+unsigned char FOHCMicExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
 
 #endif

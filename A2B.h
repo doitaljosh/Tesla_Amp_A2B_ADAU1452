@@ -1,7 +1,9 @@
 #ifndef __A2B_H__
 #define __A2B_H__
 
+#include <Arduino.h>
 #include "Settings.h"
+#include "Utils.h"
 
 #define AD242x_REG_CHIP 0x00
 #define AD242x_REG_NODEADR 0x01
@@ -161,16 +163,36 @@ enum intTypes {
   MSTR_RUNNING = 255
 };
 
+mappedMsg_t lineFaultStrings[] = {
+  {SRFMISSERR, "SRF Miss Error"},
+  {BECOVERFLOW, "Bit Error Count Overflow"},
+  {UNDETERMINED, "Indeterminate Fault"},
+  {SHORT_REMOTE_BUSNEG2GND, "Negative Wire Shorted to GND"},
+  {SHORT_REMOTE_BUSPOS2VBAT, "Positive Wire Shorted to VBAT"},
+  {SHORT_BUSPOS2GND, "Positive Wire Shorted to GND"},
+  {SHORT_BUSNEG2VBAT, "Negative Wire Shorted to VBAT"},
+  {SHORT_BUSPOS2BUSNEG, "Wires Shorted Together"},
+  {CABLE_DISCONNECTED, "Wire Open or Wrong Port"},
+  {CABLE_REVERSED, "Wires Interchanged"},
+  {INTMSGERR, "Interrupt Messaging Error"}
+};
+
 // Function prototypes
-int a2bWriteLocalReg(byte reg, byte len, byte data[]);
-char* a2bReadLocalReg(int i2cAddr, byte reg, byte len);
+int a2bWriteLocalReg(byte reg, byte data);
+char a2bReadLocalReg(byte reg);
+int a2bWriteLocalRegBlock(byte reg, byte len, byte data[]);
+char* a2bReadLocalRegBlock(byte reg, byte len);
 char a2bGetCurrentNodeAddr(void);
 bool isPeriEnabled(void);
 int a2bSetNodeAddr(int node, bool bcast, bool enablePeri);
-int a2bWriteRemoteReg(int nodeAddr, byte reg, byte len, byte data[]);
-char* a2bReadRemoteReg(int nodeAddr, byte reg, byte len);
-int a2bWriteRemotePeriReg(int nodeAddr, byte periAddr, byte reg, byte len, byte data[]);
-char* a2bReadRemotePeriReg(int nodeAddr, byte periAddr, byte reg, byte len);
+int a2bWriteRemoteReg(int nodeAddr, byte reg, byte data);
+char a2bReadRemoteReg(int nodeAddr, byte reg);
+int a2bWriteRemoteRegBlock(int nodeAddr, byte reg, byte len, byte data[]);
+char* a2bReadRemoteRegBlock(int nodeAddr, byte reg, byte len);
+int a2bWriteRemotePeriReg(int nodeAddr, byte periAddr, byte reg, byte data);
+int a2bWriteRemotePeriRegBlock(int nodeAddr, byte periAddr, byte reg, byte len, byte data[]);
+char a2bReadRemotePeriReg(int nodeAddr, byte periAddr, byte reg);
+char* a2bReadRemotePeriRegBlock(int nodeAddr, byte periAddr, byte reg, byte len);
 a2bInt_t a2bReceiveInterrupt(void);
 
 #endif
