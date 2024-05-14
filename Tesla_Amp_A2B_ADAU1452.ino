@@ -280,7 +280,7 @@ int initAmplifierNode(void) {
           } else {
             Serial.println("E: Amplifier initialization failed.");
 
-            return 0;
+            return -1;
           }
         }
       }
@@ -323,12 +323,12 @@ int initSlaves(void) {
 
     return 1;
   } else {
-    
 
-    return 0;
+
+    return -1;
   }
 
-  return 0;  // We should never get here.
+  return -1;  // We should never get here.
 }
 
 void setup() {

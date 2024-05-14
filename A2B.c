@@ -124,7 +124,7 @@ int a2bWriteRemoteReg(int nodeAddr, byte reg, byte data) {
         Wire.endTransmission();
         return 1;
     }
-    return 0;
+    return -1;
 }
 
 int a2bWriteRemoteRegBlock(int nodeAddr, byte reg, byte len, byte data[]) {
@@ -140,9 +140,9 @@ int a2bWriteRemoteRegBlock(int nodeAddr, byte reg, byte len, byte data[]) {
             Wire.endTransmission();
             return 1;
         }
-        return 0;
+        return -1;
     }
-    return 0;
+    return -1;
 }
 
 /// @brief Reads from a register on a remote A2B node
@@ -216,7 +216,7 @@ int a2bWriteRemotePeriRegBlock(int nodeAddr, byte periAddr, byte reg, byte len, 
         a2bSetNodeAddr(nodeAddr, 0, 1);
         return a2bWriteRemoteRegBlock(nodeAddr, reg, len, data);
     }
-    return 0;
+    return -1;
 }
 
 /// @brief Reads from registers of an I2C peripheral on a remote A2B node

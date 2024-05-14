@@ -44,7 +44,7 @@ byte getMemBlockDepth(uint32_t addr) {
         return 2;
     }
 #else
-    return 0;
+    return -1;
 #endif
 }
 #endif
@@ -162,7 +162,7 @@ int dspReadReg_Byte(int addr, int len, byte *data) {
     for (int i = 0; i < len; i++) {
         data[i] = SPI.transfer(0);
     }
-    
+
     SPI.endTransaction();
     digitalWrite(DSP_PIN_SS, HIGH);
     return 1;
@@ -265,5 +265,5 @@ int dspSafeload(int addr, int numSafeload, byte data[5]) {
 
         return 1;
     }
-    return 0;
+    return -1;
 }

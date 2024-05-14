@@ -22,11 +22,11 @@ uint32_t calculateReloadValue(float timeoutSec, uint32_t prescaler, uint32_t lsi
         reloadValue = 0;
     }
 
-    return static_cast<uint32_t>(reloadValue);
+    return (uint32_t)(reloadValue);
 }
 #endif
 
-void setupWatchdog(int timeoutSec = 10) {
+void setupWatchdog(int timeoutSec) {
 
 #ifdef PLATFORM_ESP32
   esp_task_wdt_init(timeoutSec, true);
