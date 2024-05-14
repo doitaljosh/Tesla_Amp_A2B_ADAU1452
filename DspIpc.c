@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <SPI.h>
 #include "DspIpc.h"
 #include "Settings.h"
 

@@ -56,11 +56,11 @@ static unsigned int amplifierLocalA2bConfig [21][2] = {
   {(AD242x_REG_INTMSK + 1), 0x00}
 };
 
-unsigned int tda7802ConfigData[6] = {
+unsigned char tda7802ConfigData[6] = {
     0x0f, 0x00, 0x18, 0x49, 0x00, 0x01
 };
 
-unsigned int fda2100ConfigData[15] = {
+unsigned char fda2100ConfigData[15] = {
     0x5c, 0x07, 0x0f, 0x00,
     0x00, 0x11, 0x11, 0x11, 
     0x11, 0x00, 0x00, 0x00,

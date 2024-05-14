@@ -1,6 +1,4 @@
-#include "Settings.h"
 #include "A2B.h"
-#include <Wire.h>
 
 /// @brief Write to a master register
 /// @param reg 

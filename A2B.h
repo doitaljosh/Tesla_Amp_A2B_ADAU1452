@@ -2,6 +2,7 @@
 #define __A2B_H__
 
 #include <Arduino.h>
+#include <Wire.h>
 #include "Settings.h"
 #include "Utils.h"
 

@@ -4,17 +4,26 @@
 #include "DspIpc.h"
 #include "Settings.h"
 #include "Utils.h"
+#include "WatchdogTimer.h"
 
 #include <Wire.h>
 
 enum States {
   STATE_DISCOVERY_NOT_DONE = 0,
   STATE_DISCOVERY_DONE = 1,
-  STATE_SLAVE_INIT_DONE = 2
+  STATE_AMP_INIT_DONE = 2,
+  STATE_MIC_INIT_DONE = 3,
+  STATE_SLAVE_INIT_DONE = 4,
+  STATE_A2B_LINE_FAULT_BEFORE_DSCVRY = 5,
+  STATE_A2B_LINE_FAULT_POST_DSCVRY = 6,
 };
 
 bool isPostDiscovery = false;
 int currentState = STATE_DISCOVERY_NOT_DONE;
+
+int rediscoveryDelayMs = 10;
+int rediscoveryAttemptAmount = 6;
+int interruptReceiveDelayMs = 34;
 
 void printLineFaultMsg(int intType) {
   bool knownFault = false;
@@ -22,7 +31,7 @@ void printLineFaultMsg(int intType) {
 
   Serial.print("E: A2B line fault detected: ");
 
-  for (int i=0; i<numMsgs; i++) {
+  for (int i = 0; i < numMsgs; i++) {
     if (lineFaultStrings[i].msgId == intType) {
       Serial.println(lineFaultStrings[i].msg);
       knownFault = true;
@@ -38,57 +47,70 @@ void printLineFaultMsg(int intType) {
 void handleLineFault(int intType) {
   if (isPostDiscovery) {
     printLineFaultMsg(intType);
+    currentState = STATE_A2B_LINE_FAULT_POST_DSCVRY;
   } else {
-    // Diagnostics during discovery
+    printLineFaultMsg(intType);
+    currentState = STATE_A2B_LINE_FAULT_BEFORE_DSCVRY;
   }
 }
 
 void handleInterrupt(a2bInt_t a2bint) {
   switch (a2bint.MstrSub) {
-    case A2B_INTSRC_MASTER: {
-      switch (a2bint.intType) {
-        case MSTR_RUNNING: {
-          if (isPostDiscovery) {
-            handleLineFault(a2bint.intType);
-          } else {
-            beginDiscovery();
-          }
-          break;
+    case A2B_INTSRC_MASTER:
+      {
+        switch (a2bint.intType) {
+          case MSTR_RUNNING:
+            {
+              if (isPostDiscovery) {
+                handleLineFault(a2bint.intType);
+              } else {
+                beginDiscovery();
+              }
+              break;
+            }
+          case DISCOVERY_DONE:
+            {
+              initSlaves();
+              break;
+            }
         }
-        case DISCOVERY_DONE: {
-          initSlaves();
-          break;
-        }
+        break;
       }
-      break;
-    }
-    case A2B_INTSRC_SUB: {
-      switch (a2bint.nodeId) {
-        case ampNodeID: {
+    case A2B_INTSRC_SUB:
+      {
+        switch (a2bint.nodeId) {
+          case ampNodeID:
+            {
 
-          break;
-        }
-        case FOHCMicNodeID: {
+              break;
+            }
+          case FOHCMicNodeID:
+            {
 
-          break;
+              break;
+            }
+          default:
+            {
+              break;
+            }
         }
-        default: {
-          break;
-        }
+        break;
       }
-      break;
-    }
-    default: {
-      break;
-    }
+    default:
+      {
+        break;
+      }
   }
 }
 
 // For fault tolerance, this function can be re-run if a timeout has occured.
 int beginDiscovery(void) {
-  int discTimeout = 0;
+  int attempt = 0;
   int intval = 0;
-  byte DATA_INTMSK[3] = {0x10, 0x00, 0x09};
+
+  setupWatchdog(watchdogTimeoutSec);
+
+  byte DATA_INTMSK[3] = { 0x10, 0x00, 0x09 };
   // Initialize the registers necessary to begin discovery
   a2bWriteLocalReg(AD242x_REG_CONTROL, 0x04);
   delay(34);
@@ -104,14 +126,15 @@ int beginDiscovery(void) {
   // Wait for the discovery done interrupt and timeout after 35ms
   while (true) {
     a2bInt_t receivedInterrupt = a2bReceiveInterrupt();
+    petWatchdog();
 
     if (receivedInterrupt.intType != DISCOVERY_DONE) {
-      delay(5);
+      delay(rediscoveryDelayMs);
 
-      discTimeout++;
+      attempt++;
 
-      if (discTimeout > 6) {
-        discTimeout = 0;
+      if (attempt > rediscoveryAttemptAmount) {
+        attempt = 0;
 
         Serial.print("E: A2B discovery timed out. Returned interrupt ");
         Serial.println(receivedInterrupt.intType);
@@ -127,68 +150,89 @@ int beginDiscovery(void) {
       currentState = STATE_DISCOVERY_DONE;
       isPostDiscovery = true;
 
-      return DISCOVERY_DONE;
+      return STATE_DISCOVERY_DONE;
     }
-    return 0;
   }
-  return 0;
+  return STATE_DISCOVERY_NOT_DONE;
+}
+
+bool verifyChipID(byte nodeId, const byte expectedChipId[], size_t chipIdSize) {
+  byte readChipId[4];
+  char* chipIdReadResult = a2bReadRemoteRegBlock(nodeId, AD242x_REG_VENDOR, chipIdSize);
+
+  if (!chipIdReadResult) {
+    Serial.println("Error: Failed to read chip ID from hardware.");
+    return false;
+  }
+
+  // Copy the read result to the readChipID array
+  for (int i = 0; i < chipIdSize; i++) {
+    readChipId[i] = chipIdReadResult[i];
+  }
+
+  // Compare the read chip ID with the expected chip ID
+  for (int i = 0; i < chipIdSize; i++) {
+    if (readChipId[i] != expectedChipId[i]) {
+      Serial.print("E: Incorrect chip ID for node ");
+      Serial.print(nodeId);
+      Serial.print(". Expected: ");
+      for (int j = 0; j < chipIdSize; j++) {
+        Serial.print(expectedChipId[j], HEX);
+        if (j < chipIdSize - 1) Serial.print(", ");
+      }
+      Serial.print(" Read: ");
+      for (int j = 0; j < chipIdSize; j++) {
+        Serial.print(readChipId[j], HEX);
+        if (j < chipIdSize - 1) Serial.print(", ");
+      }
+      Serial.println();
+      return false;  // Chip ID does not match
+    }
+  }
+
+  Serial.print("I: Correct chip ID verified for node ");
+  Serial.print(nodeId);
+  Serial.println();
+  return true;  // Chip ID matches
 }
 
 int initFOHCMicNode(void) {
-  byte a2bFohcMicChipID[4];
-  char* a2bFohcMicReadChipID;
-  
   if (a2bGetCurrentNodeAddr() == FOHCMicNodeID) {
-    a2bFohcMicReadChipID = a2bReadRemoteRegBlock(FOHCMicNodeID, AD242x_REG_VENDOR, 4);
 
-    for (int i=0; i<4; i++) {
-      a2bFohcMicChipID[i] = a2bFohcMicReadChipID[i];
-    }
-
-    if (a2bFohcMicChipID == FOHCMicExpectedChipID) {
+    if (verifyChipID(FOHCMicNodeID, FOHCMicExpectedChipID, 4)) {
       Serial.print("I: Found Tesla Front Overhead Console Mic Array at node ID: ");
       Serial.println(FOHCMicNodeID);
 
-      for (int regidx=0; regidx < sizeof(fohcMicLocalA2bConfig); regidx++) {
+      for (int regidx = 0; regidx < sizeof(fohcMicLocalA2bConfig); regidx++) {
         a2bWriteRemoteReg(
-          FOHCMicNodeID, 
+          FOHCMicNodeID,
           fohcMicLocalA2bConfig[regidx][0],
-          fohcMicLocalA2bConfig[regidx][1]
-        );
+          fohcMicLocalA2bConfig[regidx][1]);
       }
 
       a2bWriteRemoteReg(FOHCMicNodeID, AD242x_REG_BECCTL, 0x00);
       a2bWriteRemoteReg(FOHCMicNodeID, AD242x_REG_SWCTL, A2B_SWCTL_ENSW_ENABLED);
 
-      return 1;
-    } else {
-      Serial.println("Wrong A2B chip ID detected at FOHC Mic Array node address.");
+      currentState = STATE_MIC_INIT_DONE;
 
-      return 0;
+      return 1;
     }
   }
 }
 
 int initAmplifierNode(void) {
-  byte a2bAmpChipID[4];
-  char* a2bAmpReadChipID;
   char* a2bAmpEepromData;
 
   if (a2bGetCurrentNodeAddr() == ampNodeID) {
-    a2bAmpReadChipID = a2bReadRemoteRegBlock(ampNodeID, AD242x_REG_VENDOR, 4);
 
-    for (int i=0; i<4; i++) {
-      a2bAmpChipID[i] = a2bAmpReadChipID[i];
-    }
-    
-    if (a2bAmpChipID == a2bAmpExpectedChipID) {
+    if (verifyChipID(ampNodeID, a2bAmpExpectedChipID, 4)) {
       Serial.print("I: Found Tesla A2B Amplifier at node ID: ");
       Serial.println(ampNodeID);
 
       a2bAmpEepromData = getAmplifierId();
 
       Serial.print("I: EEPROM data: ");
-      for (int i=0; i<8; i++) {
+      for (int i = 0; i < 8; i++) {
         Serial.print(a2bAmpEepromData[i], HEX);
         Serial.print(" ");
       }
@@ -196,12 +240,11 @@ int initAmplifierNode(void) {
       // additional code for handling EEPROM data
 
       // Write the configuration registers for this A2B subordinate node
-      for (int regidx=0; regidx < sizeof(amplifierLocalA2bConfig); regidx++) {
+      for (int regidx = 0; regidx < sizeof(amplifierLocalA2bConfig); regidx++) {
         a2bWriteRemoteReg(
-          ampNodeID, 
+          ampNodeID,
           amplifierLocalA2bConfig[regidx][0],
-          amplifierLocalA2bConfig[regidx][1]
-        );
+          amplifierLocalA2bConfig[regidx][1]);
       }
 
       // Enable error correction
@@ -210,25 +253,26 @@ int initAmplifierNode(void) {
 
       // Configure GPIO pins
       if (a2bReceiveInterrupt().MstrSub == A2B_INTSRC_SUB) {
-        delay(34);
+        delay(interruptReceiveDelayMs);
 
         if (a2bReceiveInterrupt().MstrSub == A2B_INTSRC_SUB) {
-          delay(23);
+          delay(interruptReceiveDelayMs);
 
           if ((int)a2bReadRemoteReg(ampNodeID, AD242x_REG_GPIOIEN) != 0x20) {
-            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOIEN, 0x20); // Enable input for GPIO5 (GPIO expander interrupt).
+            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOIEN, 0x20);  // Enable input for GPIO5 (GPIO expander interrupt).
           }
 
           if ((int)a2bReadRemoteReg(ampNodeID, AD242x_REG_GPIOOEN) != 0x44) {
-            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOOEN, 0x44); // Enable output for GPIO2 and GPIO6 (Va2b5v5 enable, unknown)
+            a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIOOEN, 0x44);  // Enable output for GPIO2 and GPIO6 (Va2b5v5 enable, unknown)
           }
 
-          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATSET, 0x04); // Set GPIO2 high (Va2b5v5 enable)
-          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATCLR, 0x40); // Clear the configuration for GPIO6
+          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATSET, 0x04);  // Set GPIO2 high (Va2b5v5 enable)
+          a2bWriteRemoteReg(ampNodeID, AD242x_REG_GPIODATCLR, 0x40);  // Clear the configuration for GPIO6
 
           // Configure all I2C peripherals inside the amplifier
           if (amplifierInit()) {
             Serial.println("I: Amplifier initialization successful.");
+            currentState = STATE_AMP_INIT_DONE;
 
             return 1;
           } else {
@@ -238,18 +282,14 @@ int initAmplifierNode(void) {
           }
         }
       }
-    } else {
-      printf("E: Wrong A2B chip ID detected at amplifier node address.");
-
-      return 0;
     }
   }
 }
 
 int initSlaves(void) {
   a2bWriteLocalReg(AD242x_REG_SWCTL, (byte)(A2B_SWCTL_MODE_USE_VIN & A2B_SWCTL_ENSW_ENABLED));
-  
-  if (currentState = STATE_DISCOVERY_DONE) {
+
+  if (currentState == STATE_DISCOVERY_DONE) {
     if (FOHCMicNodeID > 0) {
       Serial.println("I: Initializing FOHC mic array...");
       a2bSetNodeAddr(FOHCMicNodeID, A2B_NODEADR_BCAST_DIS, A2B_NODEADR_PERI_DIS);
@@ -267,20 +307,25 @@ int initSlaves(void) {
     Serial.println("I: All A2B devices found and initialized!");
 
     currentState = STATE_SLAVE_INIT_DONE;
-    
+
     return 1;
   } else {
     return 0;
   }
-  return 0; // We should never get here.
+  return 0;  // We should never get here.
 }
 
 void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+  SPI.begin();
+
   beginDiscovery();
   initSlaves();
 }
 
 void loop() {
   handleInterrupt(a2bReceiveInterrupt());
+  petWatchdog();
   delay(500);
 }
