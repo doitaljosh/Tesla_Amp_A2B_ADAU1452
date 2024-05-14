@@ -57,12 +57,19 @@ int dspWriteReg_Block(int addr, int len, byte data[]) {
 #if SPI_ENABLED
     digitalWrite(DSP_PIN_SS, LOW);
     SPI.beginTransaction(spiSettings);
-    SPI.transfer(0x0);
+
+    if (SPI.transfer(0x0) == FAILURE) {
+      SPI.endTransaction();
+      digitalWrite(DSP_PIN_SS, HIGH);
+      return -1;
+    }
+
     SPI.transfer(addr >> 8);
     SPI.transfer(addr & 0xFF);
     for (int i = 0; i < len; i++) {
         SPI.transfer(data[i]);
     }
+
     SPI.endTransaction();
     digitalWrite(DSP_PIN_SS, HIGH);
     return 1;
@@ -143,12 +150,19 @@ int dspReadReg_Byte(int addr, int len, byte *data) {
 #if SPI_ENABLED
     digitalWrite(DSP_PIN_SS, LOW);
     SPI.beginTransaction(spiSettings);
-    SPI.transfer(0x1);
+
+    if (SPI.transfer(0x1) == FAILURE) {
+      SPI.endTransaction();
+      digitalWrite(DSP_PIN_SS, HIGH);
+      return -1;
+    }
+
     SPI.transfer(addr >> 8);
     SPI.transfer(addr & 0xff);
     for (int i = 0; i < len; i++) {
         data[i] = SPI.transfer(0);
     }
+    
     SPI.endTransaction();
     digitalWrite(DSP_PIN_SS, HIGH);
     return 1;

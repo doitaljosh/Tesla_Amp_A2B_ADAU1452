@@ -207,7 +207,8 @@ int initFOHCMicNode(void) {
         a2bWriteRemoteReg(
           FOHCMicNodeID,
           fohcMicLocalA2bConfig[regidx][0],
-          fohcMicLocalA2bConfig[regidx][1]);
+          fohcMicLocalA2bConfig[regidx][1]
+        );
       }
 
       a2bWriteRemoteReg(FOHCMicNodeID, AD242x_REG_BECCTL, 0x00);
@@ -244,7 +245,8 @@ int initAmplifierNode(void) {
         a2bWriteRemoteReg(
           ampNodeID,
           amplifierLocalA2bConfig[regidx][0],
-          amplifierLocalA2bConfig[regidx][1]);
+          amplifierLocalA2bConfig[regidx][1]
+        );
       }
 
       // Enable error correction
@@ -312,7 +314,7 @@ int initSlaves(void) {
       Serial.println("I: Initializing FOHC mic array...");
       a2bSetNodeAddr(FOHCMicNodeID, A2B_NODEADR_BCAST_DIS, A2B_NODEADR_PERI_DIS);
       initFOHCMicNode();
-      
+
     }
 
     Serial.println("I: All A2B devices found and initialized!");
@@ -321,6 +323,7 @@ int initSlaves(void) {
 
     return 1;
   } else {
+    
 
     return 0;
   }
