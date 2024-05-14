@@ -290,7 +290,9 @@ int initSlaves(void) {
   a2bWriteLocalReg(AD242x_REG_SWCTL, (byte)(A2B_SWCTL_MODE_USE_VIN & A2B_SWCTL_ENSW_ENABLED));
 
   if (currentState == STATE_DISCOVERY_DONE) {
+
     if (FOHCMicNodeID > 0) {
+
       Serial.println("I: Initializing FOHC mic array...");
       a2bSetNodeAddr(FOHCMicNodeID, A2B_NODEADR_BCAST_DIS, A2B_NODEADR_PERI_DIS);
       initFOHCMicNode();
@@ -298,10 +300,19 @@ int initSlaves(void) {
       Serial.println("I: Initializing amplifier...");
       a2bSetNodeAddr(ampNodeID, A2B_NODEADR_BCAST_DIS, A2B_NODEADR_PERI_DIS);
       initAmplifierNode();
-    } else {
+
+    } else if (ampNodeID > 0) {
+
       Serial.println("I: Initializing amplifier...");
       a2bSetNodeAddr(ampNodeID, A2B_NODEADR_BCAST_DIS, A2B_NODEADR_PERI_DIS);
       initAmplifierNode();
+
+    } else {
+
+      Serial.println("I: Initializing FOHC mic array...");
+      a2bSetNodeAddr(FOHCMicNodeID, A2B_NODEADR_BCAST_DIS, A2B_NODEADR_PERI_DIS);
+      initFOHCMicNode();
+      
     }
 
     Serial.println("I: All A2B devices found and initialized!");
@@ -310,8 +321,10 @@ int initSlaves(void) {
 
     return 1;
   } else {
+
     return 0;
   }
+
   return 0;  // We should never get here.
 }
 

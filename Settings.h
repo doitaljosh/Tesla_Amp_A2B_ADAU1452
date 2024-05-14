@@ -5,8 +5,11 @@
 //#define PLATFORM_ESP32
 #define PLATFORM_STM32
 
-// Uncomment this if the amplifier is the only A2B node
+// Uncomment this if the mic array is not present
 #define FOHC_MIC_ARRAY_PRESENT
+
+// Uncomment this if the amplifier is not present
+#define AMPLIFIER_PRESENT
 
 // Watchdog timer settings
 int watchdogTimeoutSec = 10;
@@ -35,14 +38,22 @@ SPISettings spiSettings(20000000, LSBFIRST, SPI_MODE0);
 // A2B Settings
 const int masterNodeID = 0;
 
-#ifdef FOHC_MIC_ARRAY_PRESENT
+#if defined(FOHC_MIC_ARRAY_PRESENT) && defined(AMPLIFIER_PRESENT)
 /* With front overhead console mic and amplifier */
 const int FOHCMicNodeID = 1;
 const int ampNodeID = 2;
-#else
+#endif
+
+#if !defined(FOHC_MIC_ARRAY_PRESENT) && defined(AMPLIFIER_PRESENT)
 /* With only the amplifier */
 const int FOHCMicNodeID = -1;
 const int ampNodeID = 1;
+#endif
+
+#if defined(FOHC_MIC_ARRAY_PRESENT) && !defined(AMPLIFIER_PRESENT)
+/* With only the front overhead console mic */
+const int FOHCMicNodeID = 1;
+const int ampNodeID = -1;
 #endif
 
 unsigned char masterNodeChipID[4] = {0xAD, 0x02, 0x25, 0x01};
