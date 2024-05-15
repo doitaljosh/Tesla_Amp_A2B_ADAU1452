@@ -64,4 +64,7 @@ unsigned char FOHCMicExpectedChipID[4] = {0xAD, 0x10, 0x21, 0x01};
 const int audioBitRate = 32;
 const int audioSampleRate = 48000;
 
+// DSP program settings:
+const byte DSP_START_ADDR[2] = {0x00, 0x00};
+
 #endif

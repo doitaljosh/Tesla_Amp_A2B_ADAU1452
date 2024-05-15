@@ -1,4 +1,5 @@
 #include "A2B.h"
+#include "ADAU145x.h"
 #include "Amplifier.h"
 #include "FOHCMicArray.h"
 #include "DspIpc.h"
@@ -7,19 +8,6 @@
 #include "WatchdogTimer.h"
 
 #include <Wire.h>
-
-enum States {
-  STATE_DISCOVERY_NOT_DONE = 0,
-  STATE_DISCOVERY_DONE = 1,
-  STATE_AMP_INIT_DONE = 2,
-  STATE_MIC_INIT_DONE = 3,
-  STATE_SLAVE_INIT_DONE = 4,
-  STATE_A2B_LINE_FAULT_BEFORE_DSCVRY = 5,
-  STATE_A2B_LINE_FAULT_POST_DSCVRY = 6,
-};
-
-bool isPostDiscovery = false;
-int currentState = STATE_DISCOVERY_NOT_DONE;
 
 int rediscoveryDelayMs = 10;
 int rediscoveryAttemptAmount = 6;
@@ -63,13 +51,19 @@ void handleInterrupt(a2bInt_t a2bint) {
             {
               if (isPostDiscovery) {
                 handleLineFault(a2bint.intType);
+                currentState = beginDiscovery();
               } else {
-                beginDiscovery();
+                if (dspInitDone && (currentState != STATE_DSP_NEEDS_REINIT)) {
+                  currentState = beginDiscovery();
+                } else {
+                  dspInit();
+                }
               }
               break;
             }
           case DISCOVERY_DONE:
             {
+              currentState = STATE_DISCOVERY_DONE;
               initSlaves();
               break;
             }
@@ -105,55 +99,59 @@ void handleInterrupt(a2bInt_t a2bint) {
 
 // For fault tolerance, this function can be re-run if a timeout has occured.
 int beginDiscovery(void) {
-  int attempt = 0;
-  int intval = 0;
+  if (dspInitDone) {
+    int attempt = 0;
+    int intval = 0;
 
-  setupWatchdog(watchdogTimeoutSec);
+    setupWatchdog(watchdogTimeoutSec);
 
-  byte DATA_INTMSK[3] = { 0x10, 0x00, 0x09 };
-  // Initialize the registers necessary to begin discovery
-  a2bWriteLocalReg(AD242x_REG_CONTROL, 0x04);
-  delay(34);
-  a2bWriteLocalRegBlock(AD242x_REG_INTMSK, 3, DATA_INTMSK);
-  a2bWriteLocalReg(AD242x_REG_BECCTL, 0x00);
-  a2bWriteLocalReg((AD242x_REG_INTPND + 0x02), 0x01);
-  a2bWriteLocalReg(AD242x_REG_RESPCYCS, 0x92);
-  a2bWriteLocalReg(AD242x_REG_CONTROL, 0x01);
-  a2bWriteLocalReg(AD242x_REG_PLLCTL, 0x00);
-  a2bWriteLocalReg(AD242x_REG_I2SGCFG, 0x02);
-  a2bWriteLocalReg(AD242x_REG_SWCTL, 0x01);
-  a2bWriteLocalReg(AD242x_REG_DISCVRY, 0x92);
-  // Wait for the discovery done interrupt and timeout after 35ms
-  while (true) {
-    a2bInt_t receivedInterrupt = a2bReceiveInterrupt();
-    petWatchdog();
+    byte DATA_INTMSK[3] = { 0x10, 0x00, 0x09 };
+    // Initialize the registers necessary to begin discovery
+    a2bWriteLocalReg(AD242x_REG_CONTROL, 0x04);
+    delay(34);
+    a2bWriteLocalRegBlock(AD242x_REG_INTMSK, 3, DATA_INTMSK);
+    a2bWriteLocalReg(AD242x_REG_BECCTL, 0x00);
+    a2bWriteLocalReg((AD242x_REG_INTPND + 0x02), 0x01);
+    a2bWriteLocalReg(AD242x_REG_RESPCYCS, 0x92);
+    a2bWriteLocalReg(AD242x_REG_CONTROL, 0x01);
+    a2bWriteLocalReg(AD242x_REG_PLLCTL, 0x00);
+    a2bWriteLocalReg(AD242x_REG_I2SGCFG, 0x02);
+    a2bWriteLocalReg(AD242x_REG_SWCTL, 0x01);
+    a2bWriteLocalReg(AD242x_REG_DISCVRY, 0x92);
+    // Wait for the discovery done interrupt and timeout after 35ms
+    while (true) {
+      a2bInt_t receivedInterrupt = a2bReceiveInterrupt();
+      petWatchdog();
 
-    if (receivedInterrupt.intType != DISCOVERY_DONE) {
-      delay(rediscoveryDelayMs);
+      if (receivedInterrupt.intType != DISCOVERY_DONE) {
+        delay(rediscoveryDelayMs);
 
-      attempt++;
+        attempt++;
 
-      if (attempt > rediscoveryAttemptAmount) {
-        attempt = 0;
+        if (attempt > rediscoveryAttemptAmount) {
+          attempt = 0;
 
-        Serial.print("E: A2B discovery timed out. Returned interrupt ");
-        Serial.println(receivedInterrupt.intType);
+          Serial.print("E: A2B discovery timed out. Returned interrupt ");
+          Serial.println(receivedInterrupt.intType);
 
-        currentState = STATE_DISCOVERY_NOT_DONE;
-        isPostDiscovery = false;
+          currentState = STATE_DISCOVERY_NOT_DONE;
+          isPostDiscovery = false;
 
-        handleInterrupt(receivedInterrupt);
+          handleInterrupt(receivedInterrupt);
+        }
+      } else {
+        Serial.println("I: A2B discovery done.");
+
+        currentState = STATE_DISCOVERY_DONE;
+        isPostDiscovery = true;
+
+        return STATE_DISCOVERY_DONE;
       }
-    } else {
-      Serial.println("I: A2B discovery done.");
-
-      currentState = STATE_DISCOVERY_DONE;
-      isPostDiscovery = true;
-
-      return STATE_DISCOVERY_DONE;
     }
+    return STATE_DISCOVERY_NOT_DONE;
+  } else {
+    return STATE_DSP_NEEDS_REINIT;
   }
-  return STATE_DISCOVERY_NOT_DONE;
 }
 
 bool verifyChipID(byte nodeId, const byte expectedChipId[], size_t chipIdSize) {
@@ -336,6 +334,7 @@ void setup() {
   Wire.begin();
   SPI.begin();
 
+  dspInit();
   beginDiscovery();
   initSlaves();
 }

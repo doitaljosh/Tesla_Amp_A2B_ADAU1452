@@ -14,10 +14,6 @@
 typedef unsigned short dspdata_t;
 typedef unsigned short dspreg_t;
 
-#define REG_SAFELOAD_BASE 0x6000
-#define REG_SAFELOAD_TARGET_ADDR (REG_SAFELOAD_BASE + 5)
-#define REG_SAFELOAD_NUM (REG_SAFELOAD_BASE + 6)
-
 const int sampleRate = 48000;
 
 // Function prototypes

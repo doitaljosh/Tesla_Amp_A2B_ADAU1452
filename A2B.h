@@ -196,4 +196,6 @@ char a2bReadRemotePeriReg(int nodeAddr, byte periAddr, byte reg);
 char* a2bReadRemotePeriRegBlock(int nodeAddr, byte periAddr, byte reg, byte len);
 a2bInt_t a2bReceiveInterrupt(void);
 
+bool isPostDiscovery = false;
+
 #endif
