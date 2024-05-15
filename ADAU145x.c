@@ -29,15 +29,51 @@ void dspKillCore(bool state) {
 }
 
 int dspUploadProgramData(void) {
-  return dspWriteReg_Block(PROGRAM_ADDR_IC_1, PROGRAM_SIZE_IC_1, Program_Data_IC_1);
+  if ((PROGRAM_SIZE_IC_1 <= PROGMEM_MAX_SIZE) && (sizeof(Program_Data_IC_1) <= PROGMEM_MAX_SIZE)) {
+    dspWriteReg_Block(PROGRAM_ADDR_IC_1, PROGRAM_SIZE_IC_1, Program_Data_IC_1);
+
+    return 1
+  } else {
+    Serial.println("E: DSP Program data size too large.");
+    Serial.print(PROGMEM_MAX_SIZE);
+    Serial.print(", actual size: ");
+    Serial.print(sizeof(Program_Data_IC_1));
+    Serial.println();
+
+    return -1
+  }
 }
 
 int dspUploadDm0(void) {
-  return dspWriteReg_Block(PARAM_ADDR_IC_1, PARAM_SIZE_IC_1, Param_Data_IC_1);
+  if ((PARAM_SIZE_IC_1 <= DM0_MAX_SIZE) && (sizeof(Param_Data_IC_1) <= DM0_MAX_SIZE)) {
+    dspWriteReg_Block(PARAM_ADDR_IC_1, PARAM_SIZE_IC_1, Param_Data_IC_1);
+
+    return 1
+  } else {
+    Serial.print("E: DSP Parameter data size too large. Maximum size: ");
+    Serial.print(DM0_MAX_SIZE);
+    Serial.print(", actual size: ");
+    Serial.print(sizeof(Param_Data_IC_1));
+    Serial.println();
+
+    return -1
+  }
 }
 
 int dspUploadDm1(void) {
-  return dspWriteReg_Block(DM1_DATA_ADDR_IC_1, DM1_DATA_SIZE_IC_1, DM1_DATA_Data_IC_1);
+  if ((DM1_DATA_SIZE_IC_1 <= DM1_MAX_SIZE) && (sizeof(DM1_DATA_Data_IC_1) <= DM1_MAX_SIZE)) {
+    dspWriteReg_Block(DM1_DATA_ADDR_IC_1, DM1_DATA_SIZE_IC_1, DM1_DATA_Data_IC_1);
+  
+    return 1;
+  } else {
+    Serial.print("E: DSP DM1 data size too large. Maximum size: ");
+    Serial.print(DM1_MAX_SIZE);
+    Serial.print(", actual size: ");
+    Serial.print(sizeof(DM1_DATA_Data_IC_1));
+    Serial.println();
+
+    return -1
+  }
 }
 
 int dspInit(void) {
@@ -95,5 +131,9 @@ int dspInit(void) {
 
   dspInitDone = true;
 
-  return STATE_DSP_INIT_DONE;
+  if (ret == 3) {
+    return STATE_DSP_INIT_DONE;
+  else {
+    return STATE_DSP_NEEDS_REINIT;
+  }
 }

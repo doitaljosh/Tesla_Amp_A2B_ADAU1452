@@ -177,17 +177,17 @@ typedef enum {
 #define DM1_BASE 0x6000
 #define PROGMEM_BASE 0xC000
 
-#define PROGMEM_SIZE 0x2000
+#define PROGMEM_MAX_SIZE 0x2000
 
 #if DSP_CORE == SIGMA100
-#define DM0_SIZE 0x5000
-#define DM1_SIZE 0x5000
+#define DM0_MAX_SIZE 0x5000
+#define DM1_MAX_SIZE 0x5000
 #elif DSP_CORE == SIGMA200
-#define DM0_SIZE 0x4000
-#define DM1_SIZE 0x4000
+#define DM0_MAX_SIZE 0x4000
+#define DM1_MAX_SIZE 0x4000
 #elif DSP_CORE == SIGMA300
-#define DM0_SIZE 0x2000
-#define DM1_SIZE 0x2000
+#define DM0_MAX_SIZE 0x2000
+#define DM1_MAX_SIZE 0x2000
 #endif
 
 // Safeload regions

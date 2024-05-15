@@ -53,10 +53,10 @@ void handleInterrupt(a2bInt_t a2bint) {
                 handleLineFault(a2bint.intType);
                 currentState = beginDiscovery();
               } else {
-                if (dspInitDone && (currentState != STATE_DSP_NEEDS_REINIT)) {
+                if (dspInitDone && (currentState != STATE_DSP_NEEDS_REINIT) ) {
                   currentState = beginDiscovery();
                 } else {
-                  dspInit();
+                  currentState = dspInit();
                 }
               }
               break;
@@ -64,7 +64,7 @@ void handleInterrupt(a2bInt_t a2bint) {
           case DISCOVERY_DONE:
             {
               currentState = STATE_DISCOVERY_DONE;
-              initSlaves();
+              currentState = initSlaves();
               break;
             }
         }
@@ -317,13 +317,11 @@ int initSlaves(void) {
 
     Serial.println("I: All A2B devices found and initialized!");
 
-    currentState = STATE_SLAVE_INIT_DONE;
-
-    return 1;
+    return STATE_SLAVE_INIT_DONE;
   } else {
 
 
-    return -1;
+    return STATE_A2B_NEEDS_REDISCOVERY;
   }
 
   return -1;  // We should never get here.
